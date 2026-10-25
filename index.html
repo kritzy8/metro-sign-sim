@@ -40,6 +40,8 @@
           transition: background .3s; justify-self: center; width: 100%; }
   .door.yes { background: #17803d; }
   .door.no { background: #b3261e; }
+  .door.warn { animation: warnblink .7s infinite; }
+  @keyframes warnblink { 0%, 49% { background: #f5c400; color: #1b1b1b; } 50%, 100% { background: #17803d; color: #fff; } }
   .door svg { width: 56px; height: 40px; flex: none; }
   .door b { display: block; font-size: 30px; line-height: 1.2; }
   .door small { display: block; font-size: 18px; opacity: .92; }
@@ -161,7 +163,7 @@
 
       <div class="bottom">
         <div class="line-badge"><b id="lineTh"></b><span id="lineEn"></span></div>
-        <div class="dest"><small>ปลายทาง · Destination</small><b id="destTh"></b><span id="destEn"></span></div>
+        <div class="dest"><small id="destLbl">ปลายทาง · Destination</small><b id="destTh"></b><span id="destEn"></span></div>
       </div>
 
       <div class="ticker" id="ticker"><div class="ticker-track" id="track"></div></div>
@@ -220,6 +222,7 @@
       <h2>การจำลองการเดินรถ</h2>
       <label class="f">เวลาช่วง “กำลังเข้าสู่สถานี” (วินาที)</label><input type="number" id="approachSec" min="2" max="300">
       <label class="f">เวลาช่วง “จอดที่สถานี” (วินาที)</label><input type="number" id="stopSec" min="2" max="300">
+      <label class="f"><input type="checkbox" id="loopMode"> โหมดสายวงกลม (Loop line): วิ่งวนจากสถานีสุดท้ายกลับไปสถานีแรกต่อเนื่อง ไม่กลับทิศทาง</label>
       <p class="hint">โหมดอัตโนมัติจะวนไปตามรายการสถานี เมื่อถึงสถานีปลายทางจะกลับทิศทางเอง หรือจะกดปุ่มด้านบนเพื่อเปลี่ยนสถานะเองก็ได้</p>
     </section>
 
@@ -270,6 +273,7 @@
     screenSide: 'left',
     frontSide: 'right',
     aspect: '16:9',
+    loop: false,
     stations: [
       { code: 'BL11', th: 'บางซื่อ', en: 'Bang Sue', door: 'left', ic: [{ th: 'สายสีแดง', en: 'Red Line', color: '#d32f2f' }] },
       { code: 'BL13', th: 'สวนจตุจักร', en: 'Chatuchak Park', door: 'left', ic: [{ th: 'BTS สายสุขุมวิท', en: 'BTS Sukhumvit Line', color: '#7cb342' }] },
@@ -301,6 +305,7 @@
       screenSide: j.screenSide === 'right' ? 'right' : 'left',
       frontSide: j.frontSide === 'left' ? 'left' : 'right',
       aspect: j.aspect === '21:9' ? '21:9' : '16:9',
+      loop: !!j.loop,
       time: Object.assign({}, d.time, j.time || {}),
       ticker: Object.assign({}, d.ticker, j.ticker || {}),
       sim: Object.assign({}, d.sim, j.sim || {})
@@ -412,9 +417,16 @@
     // bottom corners
     $('#lineTh').textContent = cfg.line.th;
     $('#lineEn').textContent = cfg.line.en;
-    const dst = state.dir === 1 ? S[n - 1] : S[0];
-    $('#destTh').textContent = dst.th || '—';
-    $('#destEn').textContent = dst.en || '';
+    if (cfg.loop) {
+      $('#destLbl').textContent = 'สายวงกลม · Loop Line';
+      $('#destTh').textContent = state.dir === 1 ? 'ตามเข็มนาฬิกา' : 'ทวนเข็มนาฬิกา';
+      $('#destEn').textContent = state.dir === 1 ? 'Clockwise' : 'Counter-clockwise';
+    } else {
+      const dst = state.dir === 1 ? S[n - 1] : S[0];
+      $('#destLbl').textContent = 'ปลายทาง · Destination';
+      $('#destTh').textContent = dst.th || '—';
+      $('#destEn').textContent = dst.en || '';
+    }
 
     refreshControls();
   }
@@ -482,7 +494,9 @@
       state.phase = 'stopped';
     } else {
       let next = state.cur + state.dir;
-      if (next < 0 || next >= n) {
+      if (cfg.loop) {
+        next = (next + n) % n;
+      } else if (next < 0 || next >= n) {
         state.dir = -state.dir;
         next = state.cur + state.dir;
         if (next < 0 || next >= n) next = state.cur;
@@ -498,7 +512,8 @@
     if (state.phase === 'stopped') {
       state.phase = 'approach';
     } else {
-      const prev = state.cur - state.dir;
+      let prev = state.cur - state.dir;
+      if (cfg.loop) prev = (prev + n) % n;
       if (prev < 0 || prev >= n) return;
       state.cur = prev;
       state.phase = 'stopped';
@@ -511,6 +526,8 @@
     const dur = (state.phase === 'approach' ? cfg.sim.approach : cfg.sim.stop) * 1000;
     const el = performance.now() - state.t0;
     if (cfg.sim.auto && el >= dur) advance();
+    const doorEl = $('#door');
+    doorEl.classList.toggle('warn', cfg.sim.auto && state.phase === 'stopped' && doorEl.classList.contains('yes') && dur - el <= 3000);
     const left = Math.max(0, Math.ceil((dur - el) / 1000));
     const st = cfg.stations[state.cur];
     $('#status').textContent = (state.phase === 'approach' ? 'กำลังเข้าสู่สถานี ' : 'จอดที่สถานี ') + (st ? st.th : '') +
@@ -521,7 +538,9 @@
   /* ---------------- controls ---------------- */
   function refreshControls() {
     $('#btnAuto').textContent = cfg.sim.auto ? '⏸ หยุดอัตโนมัติ' : '▶ เล่นอัตโนมัติ';
-    $('#btnDir').textContent = state.dir === 1 ? 'ทิศทาง: ขาไป →' : 'ทิศทาง: ← ขากลับ';
+    $('#btnDir').textContent = cfg.loop
+      ? (state.dir === 1 ? 'ทิศทาง: ตามเข็ม ↻' : 'ทิศทาง: ทวนเข็ม ↺')
+      : (state.dir === 1 ? 'ทิศทาง: ขาไป →' : 'ทิศทาง: ← ขากลับ');
     const sel = $('#selStation');
     if (sel.options.length !== cfg.stations.length) fillSelect();
     else cfg.stations.forEach((s, i) => { sel.options[i].textContent = `${i + 1}. ${s.th}`; });
@@ -569,6 +588,7 @@
     $('#tkSpeedVal').textContent = cfg.ticker.speed;
     $('#approachSec').value = cfg.sim.approach;
     $('#stopSec').value = cfg.sim.stop;
+    $('#loopMode').checked = cfg.loop;
     applySim();
     renderStations();
     fillSelect();
@@ -601,6 +621,7 @@
   $('#tkSpeed').oninput = (e) => { cfg.ticker.speed = +e.target.value; $('#tkSpeedVal').textContent = e.target.value; save(); setupTickerSoon(); };
 
   $('#approachSec').oninput = (e) => { cfg.sim.approach = clamp(+e.target.value || 12, 2, 300); save(); };
+  $('#loopMode').onchange = (e) => { cfg.loop = e.target.checked; save(); render(); };
   $('#stopSec').oninput = (e) => { cfg.sim.stop = clamp(+e.target.value || 8, 2, 300); save(); };
 
   /* ---------------- station editor ---------------- */
