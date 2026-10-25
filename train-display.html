@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>จำลองหน้าจอภายในรถไฟฟ้า</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root { --font: "Noto Sans Thai", "Sarabun", Tahoma, system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--font); background: #e8ebf0; color: #1b2230; }
+  header.page { max-width: 1280px; margin: 0 auto; padding: 20px 20px 8px; }
+  header.page h1 { margin: 0 0 4px; font-size: 22px; }
+  header.page p { margin: 0; color: #5a6475; font-size: 14px; }
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 8px 20px 40px; }
+
+  /* ============ DISPLAY (logical size 1280x720, scaled by JS) ============ */
+  .stage { position: relative; width: 100%; aspect-ratio: var(--ar, 16/9); background: #000; overflow: hidden;
+           border-radius: 14px; box-shadow: 0 10px 30px rgba(10,20,40,.35); }
+  .stage:fullscreen { aspect-ratio: auto; width: 100vw; height: 100vh; border-radius: 0; }
+  .screen { position: absolute; left: 0; top: 0; width: var(--sw, 1280px); height: 720px; transform-origin: 0 0;
+            background: linear-gradient(180deg, #0f1829 0%, #070b13 100%); color: #fff; overflow: hidden;
+            font-family: var(--font); }
+  .screen .bar { position: absolute; left: 0; right: 0; top: 0; height: 10px; background: var(--line); }
+
+  .top { position: absolute; top: 24px; left: 0; right: 0; height: 130px; padding: 0 32px;
+         display: grid; grid-template-columns: 1fr 450px 1fr; gap: 16px; align-items: start; }
+  .ic { transition: opacity .3s; }
+  .ic.hide { opacity: 0; }
+  .ic-title { font-size: 20px; color: #aab6c8; line-height: 1.25; margin-bottom: 8px; }
+  .ic-title small { display: block; font-size: 15px; color: #7f8da3; }
+  .ic-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { display: inline-flex; align-items: baseline; gap: 8px; padding: 5px 14px; border-radius: 999px;
+          font-weight: 700; font-size: 22px; line-height: 1.3; }
+  .chip small { font-size: 14px; font-weight: 400; opacity: .9; }
+
+  .door { display: flex; align-items: center; gap: 16px; padding: 10px 22px; border-radius: 18px; min-height: 80px;
+          transition: background .3s; justify-self: center; width: 100%; }
+  .door.yes { background: #17803d; }
+  .door.no { background: #b3261e; }
+  .door svg { width: 56px; height: 40px; flex: none; }
+  .door b { display: block; font-size: 30px; line-height: 1.2; }
+  .door small { display: block; font-size: 18px; opacity: .92; }
+
+  .clock { text-align: right; }
+  .clock .date { font-size: 26px; color: #cfd8e6; }
+  .clock .time { font-size: 56px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .clock .colon.off { opacity: .15; }
+
+  .center { position: absolute; top: 160px; bottom: 204px; left: 0; right: 0; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 6px; }
+  .state-row { display: flex; align-items: center; gap: 14px; font-size: 28px; color: #cfd8e6; }
+  .state-row small { font-size: 22px; color: #8f9db3; }
+  .code { background: var(--line); color: var(--ink); font-weight: 800; font-size: 26px; padding: 2px 14px; border-radius: 8px; }
+  .code:empty { display: none; }
+  .name-row { display: flex; align-items: center; justify-content: center; gap: 28px; width: calc(var(--sw, 1280px) - 64px); }
+  .name-box { text-align: center; max-width: calc(var(--sw, 1280px) - 320px); line-height: 1.1; }
+  .name-box.pop { animation: pop .45s ease-out; }
+  @keyframes pop { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  .name-th { display: inline-block; white-space: nowrap; font-weight: 800; font-size: 124px; line-height: 1.25; }
+  .name-en { display: block; margin: 0 auto; width: max-content; white-space: nowrap; font-weight: 600; font-size: 50px; color: #dfe6f1; }
+  .arrows { width: 90px; height: 120px; flex: none; transition: opacity .5s; }
+  .arrows.off { opacity: 0; }
+  .arrows.flip { transform: scaleX(-1); }
+  .arrows polyline { fill: none; stroke: #ffc933; stroke-width: 14; stroke-linecap: round; stroke-linejoin: round; opacity: .15; }
+  .arrows:not(.off) polyline { animation: chev 1.2s infinite; }
+  .arrows polyline:nth-child(2) { animation-delay: .25s !important; }
+  .arrows polyline:nth-child(3) { animation-delay: .5s !important; }
+  @keyframes chev { 0%, 100% { opacity: .12; } 30%, 60% { opacity: 1; } }
+
+  .bottom { position: absolute; left: 0; right: 0; bottom: 70px; height: 118px; padding: 0 32px;
+            display: flex; justify-content: space-between; align-items: flex-end; }
+  .line-badge { background: var(--line); color: var(--ink); padding: 8px 28px 10px; border-radius: 14px; line-height: 1.2; }
+  .line-badge b { display: block; font-size: 42px; }
+  .line-badge span { font-size: 22px; opacity: .92; }
+  .dest { text-align: right; line-height: 1.2; }
+  .dest small { display: block; font-size: 20px; color: #8f9db3; }
+  .dest b { display: block; font-size: 42px; }
+  .dest span { font-size: 22px; color: #cfd8e6; }
+
+  .ticker { position: absolute; left: 0; right: 0; bottom: 0; height: 62px; background: #03060b;
+            border-top: 3px solid var(--line); overflow: hidden; }
+  .ticker-track { position: absolute; left: 0; top: 0; display: inline-block; white-space: pre; line-height: 59px;
+                  font-size: 30px; color: #fff; will-change: transform; }
+
+  /* ============ CONTROL PANEL ============ */
+  .toolbar { margin-top: 16px; background: #fff; border-radius: 14px; padding: 14px 16px; display: flex; flex-wrap: wrap;
+             gap: 10px; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .toolbar .grow { flex: 1 1 220px; font-size: 14px; color: #44506a; }
+  .progress { height: 6px; background: #dfe4ec; border-radius: 3px; overflow: hidden; margin-top: 6px; }
+  .progress i { display: block; height: 100%; width: 0; background: #2f6fed; }
+  .btn { font: inherit; font-size: 14px; border: 1px solid #c4ccd9; background: #f6f8fb; color: #1b2230; padding: 8px 14px;
+         border-radius: 10px; cursor: pointer; }
+  .btn:hover { background: #e9eef6; }
+  .btn.primary { background: #2f6fed; border-color: #2f6fed; color: #fff; }
+  .btn.sm { padding: 4px 9px; }
+  .btn.danger { color: #b3261e; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; margin-top: 16px; }
+  .card { background: #fff; border-radius: 14px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .card.wide { grid-column: 1 / -1; }
+  .card h2 { margin: 0 0 12px; font-size: 17px; }
+  label.f { display: block; font-size: 13px; color: #5a6475; margin: 10px 0 4px; }
+  input[type=text], input[type=number], input[type=datetime-local], select, textarea {
+    font: inherit; font-size: 14px; width: 100%; padding: 7px 9px; border: 1px solid #c4ccd9; border-radius: 8px; background: #fff; color: #1b2230; }
+  textarea { min-height: 110px; resize: vertical; }
+  input[type=color] { width: 42px; height: 34px; padding: 2px; border: 1px solid #c4ccd9; border-radius: 8px; background: #fff; flex: none; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .row > * { min-width: 0; }
+  .hint { font-size: 12.5px; color: #6b7587; margin: 6px 0 0; line-height: 1.5; }
+  .radio { display: flex; gap: 18px; font-size: 14px; margin: 4px 0; }
+  .st { border: 1px solid #d5dbe6; border-radius: 12px; padding: 10px; margin-bottom: 10px; background: #fafbfd; }
+  .st-head { display: grid; grid-template-columns: 28px 74px 1.2fr 1.2fr 150px auto; gap: 6px; align-items: center; }
+  .st-n { font-weight: 700; color: #5a6475; text-align: center; }
+  .st-head .acts { display: flex; gap: 4px; }
+  .ic-wrap { margin: 8px 0 0 34px; }
+  .ic-wrap > .cap { font-size: 12.5px; color: #6b7587; margin-bottom: 4px; }
+  .ic-row { display: flex; gap: 6px; align-items: center; margin-bottom: 5px; }
+  @media (max-width: 760px) {
+    .st-head { grid-template-columns: 28px 1fr 1fr; }
+    .st-head .acts { grid-column: 2 / -1; }
+    .ic-wrap { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+<header class="page">
+  <h1>จำลองหน้าจอภายในรถไฟฟ้า</h1>
+  <p>หน้าจอแสดงข้อมูลบนขบวนรถ (ขนาด 16:9) พร้อมแผงตั้งค่าสถานี สายเชื่อมต่อ ฝั่งประตู วันเวลา และข้อความประกาศ ค่าที่ตั้งจะถูกจำไว้ในเบราว์เซอร์</p>
+</header>
+
+<div class="wrap">
+  <!-- ================= DISPLAY ================= -->
+  <div class="stage" id="stage">
+    <div class="screen" id="screen">
+      <div class="bar"></div>
+      <div class="top">
+        <div class="ic" id="ic">
+          <div class="ic-title" id="icTitle"></div>
+          <div class="ic-list" id="icList"></div>
+        </div>
+        <div class="door yes" id="door">
+          <span id="doorIcon"></span>
+          <div><b id="doorTh"></b><small id="doorEn"></small></div>
+        </div>
+        <div class="clock">
+          <div class="date" id="dateTxt"></div>
+          <div class="time"><span id="hh">00</span><span class="colon" id="colon">:</span><span id="mm">00</span></div>
+        </div>
+      </div>
+
+      <div class="center">
+        <div class="state-row"><span class="code" id="code"></span><span id="stTh"></span><small id="stEn"></small></div>
+        <div class="name-row">
+          <svg class="arrows left" id="arL" viewBox="0 0 90 120"><polyline points="8,20 38,60 8,100"/><polyline points="30,20 60,60 30,100"/><polyline points="52,20 82,60 52,100"/></svg>
+          <div class="name-box" id="nameBox"><div class="name-th" id="nameTh"></div><span class="name-en" id="nameEn"></span></div>
+          <svg class="arrows" id="arR" viewBox="0 0 90 120"><polyline points="8,20 38,60 8,100"/><polyline points="30,20 60,60 30,100"/><polyline points="52,20 82,60 52,100"/></svg>
+        </div>
+      </div>
+
+      <div class="bottom">
+        <div class="line-badge"><b id="lineTh"></b><span id="lineEn"></span></div>
+        <div class="dest"><small>ปลายทาง · Destination</small><b id="destTh"></b><span id="destEn"></span></div>
+      </div>
+
+      <div class="ticker" id="ticker"><div class="ticker-track" id="track"></div></div>
+    </div>
+  </div>
+
+  <!-- ================= TOOLBAR ================= -->
+  <div class="toolbar">
+    <button class="btn" id="btnPrev">⏮ ย้อนกลับ</button>
+    <button class="btn primary" id="btnAuto"></button>
+    <button class="btn" id="btnNext">ถัดไป ⏭</button>
+    <button class="btn" id="btnDir"></button>
+    <select id="selAspect" style="width:auto" title="อัตราส่วนหน้าจอ"><option value="16:9">จอ 16:9</option><option value="21:9">จอ 21:9 (ยาว)</option></select>
+    <select id="selStation" style="width:auto;max-width:240px" title="ไปยังสถานี (กำลังเข้าใกล้)"></select>
+    <button class="btn" id="btnFull">⛶ เต็มจอ</button>
+    <div class="grow"><span id="status"></span><div class="progress"><i id="bar"></i></div></div>
+  </div>
+
+  <div class="grid">
+    <section class="card">
+      <h2>สายรถไฟฟ้า</h2>
+      <label class="f">ชื่อสาย (ไทย)</label><input type="text" id="lineThIn">
+      <label class="f">ชื่อสาย (อังกฤษ)</label><input type="text" id="lineEnIn">
+      <label class="f">สีของสาย</label>
+      <div class="row"><input type="color" id="lineColor"><input type="text" id="lineColorTxt" placeholder="#1e4db7" style="width:120px"></div>
+      <label class="f">หน้าจอนี้ติดตั้งอยู่ฝั่งใดของตัวรถ</label>
+      <select id="screenSide"><option value="left">ฝั่งซ้าย (ตามทิศทางขาไป)</option><option value="right">ฝั่งขวา (ตามทิศทางขาไป)</option></select>
+      <label class="f">ด้านหน้าของรถ (ทิศที่ลูกศรชี้) อยู่ทางใดของหน้าจอ</label>
+      <select id="frontSide"><option value="right">ขวาของหน้าจอ →</option><option value="left">ซ้ายของหน้าจอ ←</option></select>
+      <p class="hint">ใช้เทียบกับค่า “ฝั่งประตู” ของแต่ละสถานี หากประตูเปิดฝั่งเดียวกับจอ จะแสดงว่า “ประตูเปิดฝั่งนี้” ตอนรถวิ่งขากลับ ระบบจะสลับซ้าย/ขวาให้อัตโนมัติ</p>
+    </section>
+
+    <section class="card">
+      <h2>วันและเวลา</h2>
+      <div class="radio">
+        <label><input type="radio" name="tmode" value="real"> ใช้เวลาจริงของเครื่อง</label>
+        <label><input type="radio" name="tmode" value="sim"> ใช้เวลาสมมุติ</label>
+      </div>
+      <label class="f">วันเวลาสมมุติ</label>
+      <div class="row"><input type="datetime-local" id="simValue"><button class="btn" id="btnNow" type="button">ตอนนี้</button></div>
+      <label class="f"><input type="checkbox" id="simTick"> ให้เวลาสมมุติเดินต่อไปเรื่อย ๆ</label>
+      <label class="f">รูปแบบปี</label>
+      <select id="eraSel"><option value="BE">พุทธศักราช (พ.ศ.)</option><option value="CE">คริสต์ศักราช (ค.ศ.)</option></select>
+    </section>
+
+    <section class="card">
+      <h2>ข้อความประกาศ (แถบเลื่อนด้านล่าง)</h2>
+      <label class="f"><input type="checkbox" id="tkEnabled"> แสดงข้อความเลื่อน</label>
+      <label class="f">ข้อความ (หนึ่งบรรทัดต่อหนึ่งประกาศ)</label>
+      <textarea id="tkText"></textarea>
+      <label class="f">ความเร็วเลื่อน: <span id="tkSpeedVal"></span> พิกเซล/วินาที</label>
+      <input type="range" id="tkSpeed" min="40" max="320" step="10" style="width:100%">
+    </section>
+
+    <section class="card">
+      <h2>การจำลองการเดินรถ</h2>
+      <label class="f">เวลาช่วง “กำลังเข้าสู่สถานี” (วินาที)</label><input type="number" id="approachSec" min="2" max="300">
+      <label class="f">เวลาช่วง “จอดที่สถานี” (วินาที)</label><input type="number" id="stopSec" min="2" max="300">
+      <p class="hint">โหมดอัตโนมัติจะวนไปตามรายการสถานี เมื่อถึงสถานีปลายทางจะกลับทิศทางเอง หรือจะกดปุ่มด้านบนเพื่อเปลี่ยนสถานะเองก็ได้</p>
+    </section>
+
+    <section class="card wide">
+      <h2>รายการสถานี</h2>
+      <div id="stList"></div>
+      <button class="btn primary" id="btnAddSt">+ เพิ่มสถานี</button>
+      <p class="hint">เรียงจากต้นทางไปปลายทางสำหรับขาไป ฝั่งประตูของแต่ละสถานีนับตามทิศทางขาไป ข้อมูลตัวอย่างเป็นเพียงตัวอย่างสำหรับแก้ไขต่อ</p>
+    </section>
+
+    <section class="card wide">
+      <h2>สำรอง / นำเข้าการตั้งค่า</h2>
+      <textarea id="json" style="min-height:90px;font-family:monospace;font-size:12px" placeholder="กด “ส่งออก” เพื่อดูค่าที่ตั้งไว้ หรือวาง JSON แล้วกด “นำเข้า”"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button class="btn" id="btnExport">ส่งออก</button>
+        <button class="btn" id="btnImport">นำเข้า</button>
+        <button class="btn danger" id="btnReset">คืนค่าเริ่มต้น</button>
+        <span class="hint" id="jsonMsg"></span>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  const KEY = 'trainDisplayCfg_v1';
+  const $ = (s) => document.querySelector(s);
+  const clone = (o) => JSON.parse(JSON.stringify(o));
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  function h(tag, props = {}, ...kids) {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(props)) {
+      if (k === 'class') e.className = v;
+      else if (k === 'text') e.textContent = v;
+      else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+      else if (k in e) e[k] = v;
+      else e.setAttribute(k, v);
+    }
+    kids.flat().forEach((c) => c != null && e.append(c));
+    return e;
+  }
+
+  /* ---------------- default config ---------------- */
+  const DEFAULT = {
+    line: { th: 'สายสีน้ำเงิน', en: 'Blue Line', color: '#1e4db7' },
+    screenSide: 'left',
+    frontSide: 'right',
+    aspect: '16:9',
+    stations: [
+      { code: 'BL11', th: 'บางซื่อ', en: 'Bang Sue', door: 'left', ic: [{ th: 'สายสีแดง', en: 'Red Line', color: '#d32f2f' }] },
+      { code: 'BL13', th: 'สวนจตุจักร', en: 'Chatuchak Park', door: 'left', ic: [{ th: 'BTS สายสุขุมวิท', en: 'BTS Sukhumvit Line', color: '#7cb342' }] },
+      { code: 'BL15', th: 'ลาดพร้าว', en: 'Lat Phrao', door: 'right', ic: [{ th: 'สายสีเหลือง', en: 'Yellow Line', color: '#fbc02d' }] },
+      { code: 'BL19', th: 'ศูนย์วัฒนธรรมแห่งประเทศไทย', en: 'Thailand Cultural Centre', door: 'left', ic: [] },
+      { code: 'BL21', th: 'เพชรบุรี', en: 'Phetchaburi', door: 'both', ic: [{ th: 'แอร์พอร์ต เรล ลิงก์', en: 'Airport Rail Link', color: '#c62828' }] },
+      { code: 'BL22', th: 'สุขุมวิท', en: 'Sukhumvit', door: 'left', ic: [{ th: 'BTS สายสุขุมวิท', en: 'BTS Sukhumvit Line', color: '#7cb342' }] },
+      { code: 'BL26', th: 'สีลม', en: 'Silom', door: 'right', ic: [{ th: 'BTS สายสีลม', en: 'BTS Silom Line', color: '#2e7d32' }] },
+      { code: 'BL27', th: 'สามย่าน', en: 'Sam Yan', door: 'left', ic: [] },
+      { code: 'BL28', th: 'หัวลำโพง', en: 'Hua Lamphong', door: 'left', ic: [] }
+    ],
+    time: { mode: 'real', value: '', tick: true, era: 'BE' },
+    ticker: {
+      enabled: true, speed: 110,
+      lines: [
+        'ขอความร่วมมือผู้โดยสารให้ที่นั่งแก่ผู้สูงอายุ พระภิกษุ สตรีมีครรภ์ และผู้พิการ',
+        'Please mind the gap between the train and the platform.',
+        'ห้ามรับประทานอาหารและเครื่องดื่มในขบวนรถ',
+        'Please keep your belongings with you at all times.'
+      ]
+    },
+    sim: { auto: true, approach: 12, stop: 8 }
+  };
+
+  function normalize(j) {
+    const d = clone(DEFAULT);
+    const c = {
+      line: Object.assign({}, d.line, j.line || {}),
+      screenSide: j.screenSide === 'right' ? 'right' : 'left',
+      frontSide: j.frontSide === 'left' ? 'left' : 'right',
+      aspect: j.aspect === '21:9' ? '21:9' : '16:9',
+      time: Object.assign({}, d.time, j.time || {}),
+      ticker: Object.assign({}, d.ticker, j.ticker || {}),
+      sim: Object.assign({}, d.sim, j.sim || {})
+    };
+    if (!Array.isArray(c.ticker.lines)) c.ticker.lines = [];
+    c.stations = j.stations.map((s) => ({
+      code: String(s.code || ''), th: String(s.th || ''), en: String(s.en || ''),
+      door: ['left', 'right', 'both'].includes(s.door) ? s.door : 'left',
+      ic: Array.isArray(s.ic) ? s.ic.map((x) => ({ th: String(x.th || ''), en: String(x.en || ''), color: /^#[0-9a-f]{6}$/i.test(x.color) ? x.color : '#888888' })) : []
+    }));
+    if (!/^#[0-9a-f]{6}$/i.test(c.line.color)) c.line.color = d.line.color;
+    return c;
+  }
+  function load() {
+    try {
+      const j = JSON.parse(localStorage.getItem(KEY));
+      if (j && Array.isArray(j.stations) && j.stations.length) return normalize(j);
+    } catch (e) {}
+    return null;
+  }
+  let cfg = load() || clone(DEFAULT);
+  let saveT = 0;
+  function save() {
+    clearTimeout(saveT);
+    saveT = setTimeout(() => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) {} }, 250);
+  }
+
+  /* ---------------- runtime state ---------------- */
+  const state = { cur: 1, phase: 'approach', dir: 1, t0: performance.now() };
+  let simBase = new Date(), simRef = Date.now();
+
+  /* ---------------- helpers ---------------- */
+  function ink(hex) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(hex);
+    if (!m) return '#fff';
+    const n = parseInt(m[1], 16);
+    const l = 0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255);
+    return l > 150 ? '#111' : '#fff';
+  }
+  const flip = (s) => (s === 'left' ? 'right' : 'left');
+  function opensThisSide(st) {
+    if (st.door === 'both') return true;
+    const eff = state.dir === 1 ? st.door : flip(st.door);
+    return eff === cfg.screenSide;
+  }
+  function doorSvg(open) {
+    const base = '<svg viewBox="0 0 56 40" fill="none" stroke="currentColor" stroke-width="3"><rect x="2" y="2" width="52" height="36" rx="4"/>';
+    return open
+      ? base + '<rect x="8" y="8" width="14" height="26" fill="currentColor" stroke="none"/><rect x="34" y="8" width="14" height="26" fill="currentColor" stroke="none"/></svg>'
+      : base + '<rect x="8" y="8" width="19" height="26" fill="currentColor" stroke="none" opacity=".55"/><rect x="29" y="8" width="19" height="26" fill="currentColor" stroke="none" opacity=".55"/><line x1="6" y1="36" x2="50" y2="4" stroke-width="4"/></svg>';
+  }
+  function fit(el, base, min, maxW) {
+    let s = base;
+    el.style.fontSize = s + 'px';
+    while (el.offsetWidth > maxW && s > min) { s -= 3; el.style.fontSize = s + 'px'; }
+  }
+
+  /* ---------------- display render ---------------- */
+  const stage = $('#stage'), screen = $('#screen');
+  let lastKey = '';
+
+  function render() {
+    const S = cfg.stations, n = S.length;
+    if (!n) return;
+    state.cur = clamp(state.cur, 0, n - 1);
+    const st = S[state.cur];
+    const approach = state.phase === 'approach';
+
+    screen.style.setProperty('--line', cfg.line.color);
+    screen.style.setProperty('--ink', ink(cfg.line.color));
+
+    // interchange
+    const ic = $('#ic'), list = $('#icList');
+    list.replaceChildren();
+    st.ic.forEach((x) => {
+      list.append(h('span', { class: 'chip', style: `background:${x.color};color:${ink(x.color)}` },
+        x.th || x.en, x.th && x.en ? h('small', { text: x.en }) : null));
+    });
+    ic.classList.toggle('hide', !st.ic.length);
+    $('#icTitle').replaceChildren(
+      document.createTextNode(approach ? 'เปลี่ยนสายที่สถานีถัดไป' : 'เปลี่ยนสายที่สถานีนี้'),
+      h('small', { text: approach ? 'Interchange at next station' : 'Interchange at this station' }));
+
+    // door
+    const yes = opensThisSide(st);
+    $('#door').className = 'door ' + (yes ? 'yes' : 'no');
+    $('#doorIcon').innerHTML = doorSvg(yes);
+    $('#doorTh').textContent = (approach ? (yes ? 'ประตูจะเปิดฝั่งนี้' : 'ประตูจะไม่เปิดฝั่งนี้') : (yes ? 'ประตูเปิดฝั่งนี้' : 'ประตูไม่เปิดฝั่งนี้'));
+    $('#doorEn').textContent = approach
+      ? (yes ? 'Doors will open on this side' : 'Doors will not open on this side')
+      : (yes ? 'Doors open on this side' : 'Doors do not open on this side');
+
+    // center
+    $('#code').textContent = st.code;
+    $('#stTh').textContent = approach ? 'สถานีถัดไป' : 'สถานีปัจจุบัน';
+    $('#stEn').textContent = approach ? 'Next Station' : 'Current Station';
+    $('#nameTh').textContent = st.th || '—';
+    $('#nameEn').textContent = st.en || '';
+    fit($('#nameTh'), 124, 44, SW - 320);
+    fit($('#nameEn'), 50, 24, SW - 320);
+    $('#arL').classList.toggle('flip', cfg.frontSide === 'left');
+    $('#arR').classList.toggle('flip', cfg.frontSide === 'left');
+    $('#arL').classList.toggle('off', !approach);
+    $('#arR').classList.toggle('off', !approach);
+    const key = state.cur + state.phase + st.th + st.en;
+    if (key !== lastKey && lastKey) { const nb = $('#nameBox'); nb.classList.remove('pop'); void nb.offsetWidth; nb.classList.add('pop'); }
+    lastKey = key;
+
+    // bottom corners
+    $('#lineTh').textContent = cfg.line.th;
+    $('#lineEn').textContent = cfg.line.en;
+    const dst = state.dir === 1 ? S[n - 1] : S[0];
+    $('#destTh').textContent = dst.th || '—';
+    $('#destEn').textContent = dst.en || '';
+
+    refreshControls();
+  }
+
+  /* ---------------- clock ---------------- */
+  const WD = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
+  const MO = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+  function nowDate() {
+    if (cfg.time.mode === 'real') return new Date();
+    return cfg.time.tick ? new Date(simBase.getTime() + Date.now() - simRef) : simBase;
+  }
+  function updateClock() {
+    const d = nowDate();
+    const y = d.getFullYear() + (cfg.time.era === 'BE' ? 543 : 0);
+    $('#dateTxt').textContent = `${WD[d.getDay()]} ${d.getDate()} ${MO[d.getMonth()]} ${y}`;
+    $('#hh').textContent = String(d.getHours()).padStart(2, '0');
+    $('#mm').textContent = String(d.getMinutes()).padStart(2, '0');
+    $('#colon').classList.toggle('off', d.getSeconds() % 2 === 1 && (cfg.time.mode === 'real' || cfg.time.tick));
+  }
+  function toLocalInput(d) {
+    const p = (x) => String(x).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+  function applySim() {
+    const d = new Date(cfg.time.value);
+    simBase = isNaN(d) ? new Date() : d;
+    simRef = Date.now();
+  }
+
+  /* ---------------- ticker ---------------- */
+  const ticker = $('#ticker'), track = $('#track');
+  let tAnim = null, tTimer = 0;
+  function setupTicker() {
+    if (tAnim) { tAnim.cancel(); tAnim = null; }
+    const t = cfg.ticker;
+    const lines = t.lines.map((s) => s.trim()).filter(Boolean);
+    if (!t.enabled || !lines.length) { track.textContent = ''; return; }
+    track.textContent = lines.join('      ●      ');
+    const cw = ticker.clientWidth, tw = track.offsetWidth;
+    const dur = ((cw + tw) / Math.max(20, t.speed)) * 1000;
+    tAnim = track.animate([{ transform: `translateX(${cw}px)` }, { transform: `translateX(${-tw}px)` }],
+      { duration: dur, iterations: Infinity, easing: 'linear' });
+  }
+  const setupTickerSoon = () => { clearTimeout(tTimer); tTimer = setTimeout(setupTicker, 300); };
+
+  /* ---------------- scaling ---------------- */
+  let SW = 1280;
+  function applyAspect() {
+    const wide = cfg.aspect === '21:9';
+    SW = wide ? 1680 : 1280;
+    stage.style.setProperty('--ar', wide ? '21/9' : '16/9');
+    screen.style.setProperty('--sw', SW + 'px');
+  }
+  function fitScreen() {
+    const w = stage.clientWidth, hgt = stage.clientHeight;
+    const s = Math.min(w / SW, hgt / 720);
+    screen.style.transform = `translate(${(w - SW * s) / 2}px, ${(hgt - 720 * s) / 2}px) scale(${s})`;
+  }
+  new ResizeObserver(fitScreen).observe(stage);
+
+  /* ---------------- train simulation ---------------- */
+  function advance() {
+    const n = cfg.stations.length;
+    if (state.phase === 'approach') {
+      state.phase = 'stopped';
+    } else {
+      let next = state.cur + state.dir;
+      if (next < 0 || next >= n) {
+        state.dir = -state.dir;
+        next = state.cur + state.dir;
+        if (next < 0 || next >= n) next = state.cur;
+      }
+      state.cur = next;
+      state.phase = 'approach';
+    }
+    state.t0 = performance.now();
+    render();
+  }
+  function back() {
+    const n = cfg.stations.length;
+    if (state.phase === 'stopped') {
+      state.phase = 'approach';
+    } else {
+      const prev = state.cur - state.dir;
+      if (prev < 0 || prev >= n) return;
+      state.cur = prev;
+      state.phase = 'stopped';
+    }
+    state.t0 = performance.now();
+    render();
+  }
+  function tick() {
+    updateClock();
+    const dur = (state.phase === 'approach' ? cfg.sim.approach : cfg.sim.stop) * 1000;
+    const el = performance.now() - state.t0;
+    if (cfg.sim.auto && el >= dur) advance();
+    const left = Math.max(0, Math.ceil((dur - el) / 1000));
+    const st = cfg.stations[state.cur];
+    $('#status').textContent = (state.phase === 'approach' ? 'กำลังเข้าสู่สถานี ' : 'จอดที่สถานี ') + (st ? st.th : '') +
+      (cfg.sim.auto ? ` · อีก ${left} วินาที` : ' · (หยุดอัตโนมัติ)');
+    $('#bar').style.width = cfg.sim.auto ? clamp((el / dur) * 100, 0, 100) + '%' : '0';
+  }
+
+  /* ---------------- controls ---------------- */
+  function refreshControls() {
+    $('#btnAuto').textContent = cfg.sim.auto ? '⏸ หยุดอัตโนมัติ' : '▶ เล่นอัตโนมัติ';
+    $('#btnDir').textContent = state.dir === 1 ? 'ทิศทาง: ขาไป →' : 'ทิศทาง: ← ขากลับ';
+    const sel = $('#selStation');
+    if (sel.options.length !== cfg.stations.length) fillSelect();
+    else cfg.stations.forEach((s, i) => { sel.options[i].textContent = `${i + 1}. ${s.th}`; });
+    sel.value = String(state.cur);
+  }
+  function fillSelect() {
+    const sel = $('#selStation');
+    sel.replaceChildren(...cfg.stations.map((s, i) => h('option', { value: String(i), text: `${i + 1}. ${s.th}` })));
+    sel.value = String(state.cur);
+  }
+  $('#btnNext').onclick = advance;
+  $('#btnPrev').onclick = back;
+  $('#btnAuto').onclick = () => { cfg.sim.auto = !cfg.sim.auto; state.t0 = performance.now(); save(); refreshControls(); };
+  $('#btnDir').onclick = () => { state.dir = -state.dir; render(); };
+  $('#selStation').onchange = (e) => { state.cur = +e.target.value; state.phase = 'approach'; state.t0 = performance.now(); render(); };
+  $('#selAspect').onchange = (e) => {
+    cfg.aspect = e.target.value; applyAspect(); save(); fitScreen(); render(); setupTicker();
+  };
+  $('#btnFull').onclick = () => {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else if (stage.requestFullscreen) stage.requestFullscreen().catch(() => {});
+  };
+  document.addEventListener('fullscreenchange', () => { fitScreen(); setupTickerSoon(); });
+
+  /* ---------------- settings form ---------------- */
+  function changed() { save(); render(); }
+
+  function syncForm() {
+    $('#lineThIn').value = cfg.line.th;
+    $('#lineEnIn').value = cfg.line.en;
+    $('#lineColor').value = cfg.line.color;
+    $('#lineColorTxt').value = cfg.line.color;
+    $('#screenSide').value = cfg.screenSide;
+    $('#frontSide').value = cfg.frontSide;
+    $('#selAspect').value = cfg.aspect;
+    applyAspect();
+    document.querySelectorAll('input[name=tmode]').forEach((r) => { r.checked = r.value === cfg.time.mode; });
+    if (!cfg.time.value) cfg.time.value = toLocalInput(new Date());
+    $('#simValue').value = cfg.time.value;
+    $('#simTick').checked = cfg.time.tick;
+    $('#eraSel').value = cfg.time.era;
+    $('#tkEnabled').checked = cfg.ticker.enabled;
+    $('#tkText').value = cfg.ticker.lines.join('\n');
+    $('#tkSpeed').value = cfg.ticker.speed;
+    $('#tkSpeedVal').textContent = cfg.ticker.speed;
+    $('#approachSec').value = cfg.sim.approach;
+    $('#stopSec').value = cfg.sim.stop;
+    applySim();
+    renderStations();
+    fillSelect();
+  }
+
+  $('#lineThIn').oninput = (e) => { cfg.line.th = e.target.value; changed(); };
+  $('#lineEnIn').oninput = (e) => { cfg.line.en = e.target.value; changed(); };
+  $('#lineColor').oninput = (e) => { cfg.line.color = e.target.value; $('#lineColorTxt').value = e.target.value; changed(); };
+  $('#lineColorTxt').oninput = (e) => {
+    let v = e.target.value.trim(); if (v && v[0] !== '#') v = '#' + v;
+    if (/^#[0-9a-f]{6}$/i.test(v)) { cfg.line.color = v; $('#lineColor').value = v; changed(); }
+  };
+  $('#frontSide').onchange = (e) => { cfg.frontSide = e.target.value; changed(); };
+  $('#screenSide').onchange = (e) => { cfg.screenSide = e.target.value; changed(); };
+
+  document.querySelectorAll('input[name=tmode]').forEach((r) => {
+    r.onchange = () => { if (r.checked) { cfg.time.mode = r.value; if (r.value === 'sim') applySim(); save(); updateClock(); } };
+  });
+  $('#simValue').oninput = (e) => { cfg.time.value = e.target.value; applySim(); save(); updateClock(); };
+  $('#simTick').onchange = (e) => { cfg.time.tick = e.target.checked; applySim(); save(); updateClock(); };
+  $('#eraSel').onchange = (e) => { cfg.time.era = e.target.value; save(); updateClock(); };
+  $('#btnNow').onclick = () => {
+    cfg.time.value = toLocalInput(new Date()); $('#simValue').value = cfg.time.value;
+    cfg.time.mode = 'sim'; document.querySelector('input[name=tmode][value=sim]').checked = true;
+    applySim(); save(); updateClock();
+  };
+
+  $('#tkEnabled').onchange = (e) => { cfg.ticker.enabled = e.target.checked; save(); setupTicker(); };
+  $('#tkText').oninput = (e) => { cfg.ticker.lines = e.target.value.split('\n'); save(); setupTickerSoon(); };
+  $('#tkSpeed').oninput = (e) => { cfg.ticker.speed = +e.target.value; $('#tkSpeedVal').textContent = e.target.value; save(); setupTickerSoon(); };
+
+  $('#approachSec').oninput = (e) => { cfg.sim.approach = clamp(+e.target.value || 12, 2, 300); save(); };
+  $('#stopSec').oninput = (e) => { cfg.sim.stop = clamp(+e.target.value || 8, 2, 300); save(); };
+
+  /* ---------------- station editor ---------------- */
+  function inp(obj, key, ph, cls) {
+    return h('input', { type: 'text', class: cls || '', placeholder: ph, value: obj[key] || '',
+      oninput: (e) => { obj[key] = e.target.value; changed(); } });
+  }
+  function icRow(s, j) {
+    const x = s.ic[j];
+    return h('div', { class: 'ic-row' },
+      h('input', { type: 'color', value: x.color, oninput: (e) => { x.color = e.target.value; changed(); } }),
+      inp(x, 'th', 'ชื่อสาย (ไทย)'),
+      inp(x, 'en', 'Line name (EN)'),
+      h('button', { class: 'btn sm', title: 'ลบสายนี้', text: '✕', onclick: () => { s.ic.splice(j, 1); changed(); renderStations(); } }));
+  }
+  function renderStations() {
+    const box = $('#stList');
+    box.replaceChildren();
+    cfg.stations.forEach((s, i) => {
+      const doorSel = h('select', { onchange: (e) => { s.door = e.target.value; changed(); } },
+        h('option', { value: 'left', text: 'ประตูเปิดซ้าย' }),
+        h('option', { value: 'right', text: 'ประตูเปิดขวา' }),
+        h('option', { value: 'both', text: 'เปิดทั้งสองฝั่ง' }));
+      doorSel.value = s.door;
+      const move = (d) => () => {
+        const k = i + d; if (k < 0 || k >= cfg.stations.length) return;
+        [cfg.stations[i], cfg.stations[k]] = [cfg.stations[k], cfg.stations[i]];
+        if (state.cur === i) state.cur = k; else if (state.cur === k) state.cur = i;
+        changed(); renderStations();
+      };
+      const del = () => {
+        if (cfg.stations.length <= 1) return;
+        cfg.stations.splice(i, 1);
+        if (state.cur >= i && state.cur > 0) state.cur--;
+        changed(); renderStations(); fillSelect();
+      };
+      box.append(h('div', { class: 'st' },
+        h('div', { class: 'st-head' },
+          h('span', { class: 'st-n', text: i + 1 }),
+          inp(s, 'code', 'รหัส'),
+          inp(s, 'th', 'ชื่อสถานี (ไทย)'),
+          inp(s, 'en', 'Station name (EN)'),
+          doorSel,
+          h('div', { class: 'acts' },
+            h('button', { class: 'btn sm', title: 'เลื่อนขึ้น', text: '↑', onclick: move(-1) }),
+            h('button', { class: 'btn sm', title: 'เลื่อนลง', text: '↓', onclick: move(1) }),
+            h('button', { class: 'btn sm danger', title: 'ลบสถานี', text: '✕', onclick: del }))),
+        h('div', { class: 'ic-wrap' },
+          h('div', { class: 'cap', text: 'สายที่เชื่อมต่อที่สถานีนี้' }),
+          s.ic.map((_, j) => icRow(s, j)),
+          h('button', { class: 'btn sm', text: '+ เพิ่มสายเชื่อมต่อ', onclick: () => { s.ic.push({ th: '', en: '', color: '#e67e22' }); changed(); renderStations(); } }))));
+    });
+  }
+  $('#btnAddSt').onclick = () => {
+    cfg.stations.push({ code: '', th: 'สถานีใหม่', en: 'New Station', door: 'left', ic: [] });
+    changed(); renderStations(); fillSelect();
+  };
+
+  /* ---------------- import / export / reset ---------------- */
+  const msg = (t) => { $('#jsonMsg').textContent = t; };
+  $('#btnExport').onclick = () => { $('#json').value = JSON.stringify(cfg, null, 2); msg('ส่งออกแล้ว คัดลอกข้อความในช่องไปเก็บไว้ได้'); };
+  $('#btnImport').onclick = () => {
+    try {
+      const j = JSON.parse($('#json').value);
+      if (!j || !Array.isArray(j.stations) || !j.stations.length) throw new Error('no stations');
+      cfg = normalize(j); save(); state.cur = Math.min(1, cfg.stations.length - 1); state.phase = 'approach'; state.t0 = performance.now();
+      syncForm(); render(); setupTicker(); updateClock(); msg('นำเข้าสำเร็จ');
+    } catch (e) { msg('นำเข้าไม่สำเร็จ: รูปแบบ JSON ไม่ถูกต้อง'); }
+  };
+  let resetArm = 0;
+  $('#btnReset').onclick = (e) => {
+    if (!resetArm) {
+      resetArm = setTimeout(() => { resetArm = 0; e.target.textContent = 'คืนค่าเริ่มต้น'; }, 3000);
+      e.target.textContent = 'กดอีกครั้งเพื่อยืนยัน';
+      return;
+    }
+    clearTimeout(resetArm); resetArm = 0; e.target.textContent = 'คืนค่าเริ่มต้น';
+    cfg = clone(DEFAULT); save(); state.cur = 1; state.dir = 1; state.phase = 'approach'; state.t0 = performance.now();
+    syncForm(); render(); setupTicker(); updateClock(); msg('คืนค่าเริ่มต้นแล้ว');
+  };
+
+  /* ---------------- start ---------------- */
+  syncForm();
+  fitScreen();
+  render();
+  setupTicker();
+  updateClock();
+  setInterval(tick, 250);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { render(); setupTicker(); });
+  window.addEventListener('resize', setupTickerSoon);
+})();
+</script>
+</body>
+</html>
