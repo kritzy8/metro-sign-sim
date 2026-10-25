@@ -6,7 +6,7 @@
 
 ## English
 
-A single-file web app (`train-display.html`, with CSS and JavaScript inline) that simulates the passenger information screen inside an electric train. No build step, no dependencies. Open the file in a browser.
+A single-file web app (`index.html`, with CSS and JavaScript inline) that simulates the passenger information screen inside an electric train. No build step, no dependencies. Open the file in a browser.
 
 ### Screen layout
 
@@ -29,10 +29,12 @@ The screen can be set to **16:9** or **21:9** (for wide screens), and can go ful
 - **Date and time**: real time or a simulated time; the simulated clock can keep ticking; Buddhist Era (BE) or Common Era (CE) year.
 - **Announcements**: one line per message, scrolling speed, on/off.
 - **Simulation**: automatic mode with adjustable approach and stop durations, or step manually with Previous / Next; switch direction; jump to any station.
+- **Loop line mode**: when enabled, the train runs continuously from the last station back to the first without reversing. The destination area then shows the direction (clockwise / counter-clockwise) instead of a terminus.
 - **Backup**: export, import and reset the configuration as JSON. Settings are also remembered in the browser (localStorage).
 
 ### Notes
 
+- In automatic mode, during the last 3 seconds before the doors close, the door banner blinks yellow if the doors are open on this side.
 - Door sides are defined relative to the **outbound direction**. On the return direction the app flips left/right automatically.
 - The doors show "open on this side" when the station's door side matches the side the screen is mounted on, or when the station opens both sides.
 - The arrow direction does not change on the return trip, because the front of the train stays the same.
@@ -41,7 +43,7 @@ The screen can be set to **16:9** or **21:9** (for wide screens), and can go ful
 
 ### Usage
 
-1. Open `train-display.html` in a modern browser.
+1. Open `index.html` in a modern browser.
 2. Use the buttons under the screen to run or step the simulation.
 3. Edit the cards below to change the line, stations, time and announcements.
 
@@ -49,7 +51,7 @@ The screen can be set to **16:9** or **21:9** (for wide screens), and can go ful
 
 ## ภาษาไทย
 
-เว็บแอปไฟล์เดียว (`train-display.html` รวม CSS และ JavaScript ไว้ในไฟล์) สำหรับจำลองหน้าจอแสดงข้อมูลผู้โดยสารภายในรถไฟฟ้า ไม่ต้องติดตั้งหรือสร้างโปรเจกต์ เปิดไฟล์ด้วยเบราว์เซอร์ได้ทันที
+เว็บแอปไฟล์เดียว (`index.html` รวม CSS และ JavaScript ไว้ในไฟล์) สำหรับจำลองหน้าจอแสดงข้อมูลผู้โดยสารภายในรถไฟฟ้า ไม่ต้องติดตั้งหรือสร้างโปรเจกต์ เปิดไฟล์ด้วยเบราว์เซอร์ได้ทันที
 
 ### ส่วนประกอบของหน้าจอ
 
@@ -72,10 +74,12 @@ The screen can be set to **16:9** or **21:9** (for wide screens), and can go ful
 - **วันและเวลา**: ใช้เวลาจริงหรือเวลาสมมุติ ให้เวลาสมมุติเดินต่อได้ และเลือกปี พ.ศ. หรือ ค.ศ.
 - **ข้อความประกาศ**: หนึ่งบรรทัดต่อหนึ่งประกาศ ปรับความเร็วเลื่อนและเปิดปิดได้
 - **การจำลอง**: โหมดอัตโนมัติ ปรับเวลาช่วงเข้าสถานีและช่วงจอดได้ หรือกด ย้อนกลับ/ถัดไป เอง สลับทิศทาง และเลือกไปยังสถานีใดก็ได้
+- **โหมดสายวงกลม (Loop line)**: เมื่อเปิด รถจะวิ่งวนจากสถานีสุดท้ายกลับไปสถานีแรกต่อเนื่องโดยไม่กลับทิศทาง และช่องปลายทางจะแสดงทิศทาง (ตามเข็มนาฬิกา/ทวนเข็มนาฬิกา) แทนสถานีปลายทาง
 - **สำรองข้อมูล**: ส่งออก นำเข้า และคืนค่าเริ่มต้นเป็น JSON นอกจากนี้ค่าที่ตั้งจะถูกจำไว้ในเบราว์เซอร์ (localStorage)
 
 ### ข้อควรรู้
 
+- ในโหมดอัตโนมัติ ช่วง 3 วินาทีสุดท้ายก่อนประตูปิด แถบประตูด้านบนจะกะพริบสีเหลือง หากประตูเปิดฝั่งนี้
 - ฝั่งประตูของแต่ละสถานีนับตาม**ทิศทางขาไป** ตอนรถวิ่งขากลับ ระบบจะสลับซ้าย/ขวาให้อัตโนมัติ
 - จะแสดง “ประตูเปิดฝั่งนี้” เมื่อฝั่งประตูของสถานีตรงกับฝั่งที่ติดตั้งจอ หรือสถานีนั้นเปิดทั้งสองฝั่ง
 - ทิศของลูกศรไม่เปลี่ยนตอนขากลับ เพราะด้านหน้าของรถยังเป็นด้านเดิม
@@ -84,6 +88,6 @@ The screen can be set to **16:9** or **21:9** (for wide screens), and can go ful
 
 ### วิธีใช้
 
-1. เปิด `train-display.html` ด้วยเบราว์เซอร์รุ่นใหม่
+1. เปิด `index.html` ด้วยเบราว์เซอร์รุ่นใหม่
 2. ใช้ปุ่มใต้หน้าจอเพื่อเล่นอัตโนมัติหรือกดเปลี่ยนสถานะเอง
 3. แก้ไขการ์ดด้านล่างเพื่อเปลี่ยนสาย สถานี วันเวลา และข้อความประกาศ
