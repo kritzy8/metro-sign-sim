@@ -72,6 +72,34 @@
   .arrows polyline:nth-child(3) { animation-delay: .5s !important; }
   @keyframes chev { 0%, 100% { opacity: .12; } 30%, 60% { opacity: 1; } }
 
+  .center { transition: opacity .35s, visibility .35s; }
+  .screen.page-list .center { opacity: 0; visibility: hidden; }
+  .listpage { position: absolute; top: 160px; bottom: 204px; left: 0; right: 0; display: flex; flex-direction: column;
+              align-items: center; justify-content: center; gap: 14px; opacity: 0; visibility: hidden;
+              transition: opacity .35s, visibility .35s; }
+  .screen.page-list .listpage { opacity: 1; visibility: visible; }
+  .lp-title { display: flex; align-items: baseline; gap: 14px; font-size: 32px; font-weight: 600; color: #cfd8e6; }
+  .lp-title small { font-size: 22px; color: #8f9db3; font-weight: 400; }
+  .lp-track { position: relative; width: calc(var(--sw, 1280px) - 200px); }
+  .lp-nodes { display: flex; position: relative; }
+  .lp-node { flex: 1 1 0; min-width: 0; text-align: center; padding: 0 4px; }
+  .lp-tag { height: 30px; line-height: 30px; font-size: 20px; font-weight: 700; color: #ffc933; }
+  .dotbox { height: 60px; display: flex; align-items: center; justify-content: center; position: relative; z-index: 1; }
+  .dot { width: 40px; height: 40px; border-radius: 50%; background: var(--line); border: 6px solid #fff; }
+  .lp-node.next .dot { width: 56px; height: 56px; border-color: #ffc933; }
+  .lp-node.me .dot { width: 26px; height: 26px; border: none; background: #ffc933; animation: dotpulse 1.2s infinite; }
+  @keyframes dotpulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,201,51,.7); } 50% { box-shadow: 0 0 0 14px rgba(255,201,51,0); } }
+  .lp-rail { position: absolute; left: 0; right: 0; top: 53px; height: 14px; border-radius: 7px; background: var(--line);
+             box-shadow: 0 0 0 3px rgba(255,255,255,.28); }
+  .lp-head { position: absolute; top: 30px; width: 0; height: 0; border-top: 30px solid transparent; border-bottom: 30px solid transparent;
+             animation: headblink 1s infinite; }
+  .front-right .lp-head { right: -44px; border-left: 46px solid #ffc933; }
+  .front-left .lp-head { left: -44px; border-right: 46px solid #ffc933; }
+  @keyframes headblink { 0%, 100% { opacity: .25; } 40%, 70% { opacity: 1; } }
+  .lp-node .th { font-weight: 800; line-height: 1.2; margin-top: 6px; overflow-wrap: anywhere; }
+  .lp-node .en { color: #cfd8e6; line-height: 1.2; margin-top: 2px; overflow-wrap: anywhere; }
+  .lp-chips { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-top: 6px; }
+  .lp-chips span { font-size: 15px; font-weight: 700; padding: 1px 9px; border-radius: 999px; }
   .bottom { position: absolute; left: 0; right: 0; bottom: 70px; height: 118px; padding: 0 32px;
             display: flex; justify-content: space-between; align-items: flex-end; }
   .line-badge { background: var(--line); color: var(--ink); padding: 8px 28px 10px; border-radius: 14px; line-height: 1.2; }
@@ -161,6 +189,11 @@
         </div>
       </div>
 
+      <div class="listpage" id="lp">
+        <div class="lp-title"><span>สถานีถัดไป</span><small>Upcoming stations</small></div>
+        <div class="lp-track" id="lpTrack"><div class="lp-rail"></div><div class="lp-head"></div><div class="lp-nodes" id="lpNodes"></div></div>
+      </div>
+
       <div class="bottom">
         <div class="line-badge"><b id="lineTh"></b><span id="lineEn"></span></div>
         <div class="dest"><small id="destLbl">ปลายทาง · Destination</small><b id="destTh"></b><span id="destEn"></span></div>
@@ -176,6 +209,7 @@
     <button class="btn primary" id="btnAuto"></button>
     <button class="btn" id="btnNext">ถัดไป ⏭</button>
     <button class="btn" id="btnDir"></button>
+    <button class="btn" id="btnPage"></button>
     <select id="selAspect" style="width:auto" title="อัตราส่วนหน้าจอ"><option value="16:9">จอ 16:9</option><option value="21:9">จอ 21:9 (ยาว)</option></select>
     <select id="selStation" style="width:auto;max-width:240px" title="ไปยังสถานี (กำลังเข้าใกล้)"></select>
     <button class="btn" id="btnFull">⛶ เต็มจอ</button>
@@ -226,6 +260,15 @@
       <p class="hint">โหมดอัตโนมัติจะวนไปตามรายการสถานี เมื่อถึงสถานีปลายทางจะกลับทิศทางเอง หรือจะกดปุ่มด้านบนเพื่อเปลี่ยนสถานะเองก็ได้</p>
     </section>
 
+    <section class="card">
+      <h2>หน้าจอรายการสถานีถัดไป</h2>
+      <label class="f"><input type="checkbox" id="lsEnabled"> สลับไปแสดงรายการสถานีข้างหน้าระหว่างเดินทาง</label>
+      <label class="f">จำนวนสถานีที่แสดง (เช่น 3 หรือ 5)</label><input type="number" id="lsCount" min="1" max="8">
+      <label class="f">แสดงหน้า “สถานีถัดไป” นาน (วินาที)</label><input type="number" id="lsMain" min="1" max="120">
+      <label class="f">แสดงหน้า “รายการสถานี” นาน (วินาที)</label><input type="number" id="lsList" min="1" max="120">
+      <p class="hint">ระหว่างที่รถกำลังเข้าสู่สถานี หน้าจอจะแสดงสถานีถัดไปก่อน แล้วสลับไปหน้ารายการสถานีสลับกันไปจนรถถึงสถานี จากนั้นกลับเป็นหน้าปกติ ปุ่มใต้จอใช้ดูตัวอย่างหน้ารายการได้ทันที</p>
+    </section>
+
     <section class="card wide">
       <h2>รายการสถานี</h2>
       <div id="stList"></div>
@@ -274,6 +317,7 @@
     frontSide: 'right',
     aspect: '16:9',
     loop: false,
+    list: { enabled: true, count: 4, mainSec: 4, listSec: 6 },
     stations: [
       { code: 'BL11', th: 'บางซื่อ', en: 'Bang Sue', door: 'left', ic: [{ th: 'สายสีแดง', en: 'Red Line', color: '#d32f2f' }] },
       { code: 'BL13', th: 'สวนจตุจักร', en: 'Chatuchak Park', door: 'left', ic: [{ th: 'BTS สายสุขุมวิท', en: 'BTS Sukhumvit Line', color: '#7cb342' }] },
@@ -306,6 +350,7 @@
       frontSide: j.frontSide === 'left' ? 'left' : 'right',
       aspect: j.aspect === '21:9' ? '21:9' : '16:9',
       loop: !!j.loop,
+      list: Object.assign({}, d.list, j.list || {}),
       time: Object.assign({}, d.time, j.time || {}),
       ticker: Object.assign({}, d.ticker, j.ticker || {}),
       sim: Object.assign({}, d.sim, j.sim || {})
@@ -334,7 +379,7 @@
   }
 
   /* ---------------- runtime state ---------------- */
-  const state = { cur: 1, phase: 'approach', dir: 1, t0: performance.now() };
+  const state = { cur: 1, phase: 'approach', dir: 1, t0: performance.now(), page: 'main', force: null, forceT0: 0 };
   let simBase = new Date(), simRef = Date.now();
 
   /* ---------------- helpers ---------------- */
@@ -428,6 +473,7 @@
       $('#destEn').textContent = dst.en || '';
     }
 
+    setPage(desiredPage(), true);
     refreshControls();
   }
 
@@ -487,6 +533,53 @@
   }
   new ResizeObserver(fitScreen).observe(stage);
 
+  /* ---------------- upcoming-stations page ---------------- */
+  function desiredPage() {
+    const L = cfg.list;
+    if (state.phase !== 'approach') return 'main';
+    if (state.force && state.forceT0 === state.t0) return state.force;
+    if (!L.enabled) return 'main';
+    const cyc = L.mainSec + L.listSec;
+    if (cyc <= 0) return 'main';
+    const pos = ((performance.now() - state.t0) / 1000) % cyc;
+    return pos >= L.mainSec ? 'list' : 'main';
+  }
+  function setPage(p, rebuild) {
+    const changed = p !== state.page;
+    state.page = p;
+    screen.classList.toggle('page-list', p === 'list');
+    if (p === 'list' && (changed || rebuild)) buildList();
+  }
+  function buildList() {
+    const S = cfg.stations, n = S.length, L = cfg.list;
+    const avail = state.dir === 1 ? n - state.cur : state.cur + 1;
+    const k = Math.max(1, cfg.loop ? Math.min(L.count, n) : Math.min(L.count, avail));
+    const track = $('#lpTrack'), nodes = $('#lpNodes');
+    track.className = 'lp-track ' + (cfg.frontSide === 'left' ? 'front-left' : 'front-right');
+    nodes.style.flexDirection = cfg.frontSide === 'left' ? 'row-reverse' : 'row';
+    nodes.replaceChildren();
+    const nodeW = (SW - 200) / (k + 1);
+    const fs = clamp(nodeW / 7, 18, 32);
+    nodes.append(h('div', { class: 'lp-node me' },
+      h('div', { class: 'lp-tag', text: '' }),
+      h('div', { class: 'dotbox' }, h('div', { class: 'dot' })),
+      h('div', { class: 'th', style: `font-size:${fs * 0.8}px;color:#ffc933`, text: 'ขบวนนี้' }),
+      h('div', { class: 'en', style: `font-size:${fs * 0.55}px`, text: 'This train' })));
+    for (let i = 0; i < k; i++) {
+      let idx = state.cur + state.dir * i;
+      if (cfg.loop) idx = ((idx % n) + n) % n;
+      const st = S[idx];
+      const term = !cfg.loop && idx === (state.dir === 1 ? n - 1 : 0);
+      nodes.append(h('div', { class: 'lp-node' + (i === 0 ? ' next' : '') },
+        h('div', { class: 'lp-tag', text: i === 0 ? 'ถัดไป' : (term ? 'ปลายทาง' : '') }),
+        h('div', { class: 'dotbox' }, h('div', { class: 'dot' })),
+        h('div', { class: 'th', style: `font-size:${fs}px`, text: st.th || '—' }),
+        h('div', { class: 'en', style: `font-size:${fs * 0.6}px`, text: st.en || '' }),
+        st.ic.length ? h('div', { class: 'lp-chips' }, st.ic.map((x) =>
+          h('span', { style: `background:${x.color};color:${ink(x.color)}`, text: x.th || x.en }))) : null));
+    }
+  }
+
   /* ---------------- train simulation ---------------- */
   function advance() {
     const n = cfg.stations.length;
@@ -526,6 +619,7 @@
     const dur = (state.phase === 'approach' ? cfg.sim.approach : cfg.sim.stop) * 1000;
     const el = performance.now() - state.t0;
     if (cfg.sim.auto && el >= dur) advance();
+    setPage(desiredPage());
     const doorEl = $('#door');
     doorEl.classList.toggle('warn', cfg.sim.auto && state.phase === 'stopped' && doorEl.classList.contains('yes') && dur - el <= 3000);
     const left = Math.max(0, Math.ceil((dur - el) / 1000));
@@ -537,6 +631,7 @@
 
   /* ---------------- controls ---------------- */
   function refreshControls() {
+    $('#btnPage').textContent = state.force && state.forceT0 === state.t0 ? '↩ กลับหน้าปกติ' : '🗺 ดูหน้ารายการสถานี';
     $('#btnAuto').textContent = cfg.sim.auto ? '⏸ หยุดอัตโนมัติ' : '▶ เล่นอัตโนมัติ';
     $('#btnDir').textContent = cfg.loop
       ? (state.dir === 1 ? 'ทิศทาง: ตามเข็ม ↻' : 'ทิศทาง: ทวนเข็ม ↺')
@@ -555,6 +650,13 @@
   $('#btnPrev').onclick = back;
   $('#btnAuto').onclick = () => { cfg.sim.auto = !cfg.sim.auto; state.t0 = performance.now(); save(); refreshControls(); };
   $('#btnDir').onclick = () => { state.dir = -state.dir; render(); };
+  $('#btnPage').onclick = () => {
+    if (state.phase !== 'approach') { state.phase = 'approach'; state.t0 = performance.now(); }
+    const on = state.force && state.forceT0 === state.t0;
+    state.force = on ? null : 'list';
+    state.forceT0 = state.t0;
+    render();
+  };
   $('#selStation').onchange = (e) => { state.cur = +e.target.value; state.phase = 'approach'; state.t0 = performance.now(); render(); };
   $('#selAspect').onchange = (e) => {
     cfg.aspect = e.target.value; applyAspect(); save(); fitScreen(); render(); setupTicker();
@@ -589,6 +691,10 @@
     $('#approachSec').value = cfg.sim.approach;
     $('#stopSec').value = cfg.sim.stop;
     $('#loopMode').checked = cfg.loop;
+    $('#lsEnabled').checked = cfg.list.enabled;
+    $('#lsCount').value = cfg.list.count;
+    $('#lsMain').value = cfg.list.mainSec;
+    $('#lsList').value = cfg.list.listSec;
     applySim();
     renderStations();
     fillSelect();
@@ -621,6 +727,10 @@
   $('#tkSpeed').oninput = (e) => { cfg.ticker.speed = +e.target.value; $('#tkSpeedVal').textContent = e.target.value; save(); setupTickerSoon(); };
 
   $('#approachSec').oninput = (e) => { cfg.sim.approach = clamp(+e.target.value || 12, 2, 300); save(); };
+  $('#lsEnabled').onchange = (e) => { cfg.list.enabled = e.target.checked; save(); render(); };
+  [['#lsCount', 'count', 1, 8, 4], ['#lsMain', 'mainSec', 1, 120, 4], ['#lsList', 'listSec', 1, 120, 6]].forEach(([id, key, a, b, d]) => {
+    $(id).oninput = (e) => { cfg.list[key] = clamp(Math.round(+e.target.value || d), a, b); save(); render(); };
+  });
   $('#loopMode').onchange = (e) => { cfg.loop = e.target.checked; save(); render(); };
   $('#stopSec').oninput = (e) => { cfg.sim.stop = clamp(+e.target.value || 8, 2, 300); save(); };
 
